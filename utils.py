@@ -2,9 +2,37 @@
 
 import torch
 import torch.nn as nn
+from torchvision import transforms
 
+import time
 
 ### PosNeg Encoding ###
+
+class PosNegRGB(object):
+    def __init__(self, pn_threshold, greyscale, to_tensor):
+        self.pn_thresh = pn_threshold
+        self.greyscale = greyscale
+        self.to_tensor = to_tensor
+
+    def __call__(self, img):
+        
+        greyscale = self.to_tensor(self.greyscale(img))
+        out = greyscale
+        tensor = self.to_tensor(img)
+        t_shape = tensor.shape
+        tensor = tensor.reshape(3, -1)
+        maxt, _ = torch.max(tensor, 1)
+        maxt = maxt.reshape(3, -1)
+        tensor[tensor >= (self.pn_thresh * maxt)] = float('Inf')
+        tensor[tensor < (self.pn_thresh * maxt)] = 0
+        tensor_pos = tensor.clone()
+        tensor_pos[tensor_pos == 0] = 1
+        tensor_pos[tensor_pos == float('Inf')] == 0
+        tensor_pos[tensor_pos == 1] = float('Inf')
+        tensor = tensor.reshape(t_shape)
+        tensor_pos = tensor_pos.reshape(t_shape)
+        out = torch.cat([out, tensor, tensor_pos], dim=0)
+        return out
 
 class PosNeg(object):
     def __init__(self, pn_threshold):

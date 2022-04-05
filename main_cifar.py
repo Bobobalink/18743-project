@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from GlobalConvLayer import *
+
 
 import torchvision
 from torchvision.datasets import CIFAR10
@@ -31,28 +33,27 @@ args = parser.parse_args()
 
 ### Weight Update Parameters ###
 
-ucapture  = 1/2
-usearch   = 1/1024
-ubackoff  = 1/2
-
+ucapture = 1.0 / 4
+usearch = 1.0 / 3096
+ubackoff = 1.0 / 4
+rfsize = 5
+neurons = 24
 ### Column Layer Parameters ###
 
 inputsize = 32
-rfsize    = 3
 stride    = 1
-nprev     = 2
-neurons   = 12
+nprev     = 7
 theta     = 4
 
 ### Voter Layer Parameters ###
 
-rows_v    = 30
-cols_v    = 30
-nprev_v   = 12
+rows_v = 20#inputsize + 1 - rfsize
+cols_v = 20#inputsize + 1 - rfsize
+nprev_v = neurons
 classes_v = 10
-thetav_lo = 1/32
-thetav_hi = 15/32
-tau_eff   = 2
+thetav_lo = 1 / 32
+thetav_hi = 15 / 32
+tau_eff = 2
 
 ### Enabling CUDA support for GPU ###
 cuda = torch.cuda.is_available()
@@ -62,9 +63,11 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 train_loader = DataLoader(CIFAR10('./data', True, download=True, transform=transforms.Compose(
                                                                     [
-                                                                     transforms.Grayscale(num_output_channels=1),
-                                                                     transforms.ToTensor(),
-                                                                     PosNeg(0.5)
+                                                                     #transforms.Grayscale(num_output_channels=1),
+                                                                     #transforms.ToTensor(),
+                                                                     PosNegRGB(0.5, 
+                                                                               transforms.Grayscale(num_output_channels=1),
+                                                                               transforms.ToTensor())
                                                                     ]
                                                                                        )
                                ),
@@ -74,9 +77,11 @@ train_loader = DataLoader(CIFAR10('./data', True, download=True, transform=trans
 
 test_loader = DataLoader(CIFAR10('./data', False, download=True, transform=transforms.Compose(
                                                                     [
-                                                                     transforms.Grayscale(num_output_channels=1),
-                                                                     transforms.ToTensor(),
-                                                                     PosNeg(0.5)
+                                                                     #transforms.Grayscale(num_output_channels=1),
+                                                                     #transforms.ToTensor(),
+                                                                     PosNegRGB(0.5, 
+                                                                               transforms.Grayscale(num_output_channels=1),
+                                                                               transforms.ToTensor())
                                                                     ]
                                                                                        )
                                ),
@@ -112,6 +117,10 @@ if args.mode == 0:
             if cuda:
                 data                    = data.cuda()
                 target                  = target.cuda()
+            
+            
+            print(data)
+            break
 
             out1, layer_in1, layer_out1 = clayer(data[0].permute(1,2,0))
             clayer.weights = clayer.stdp(layer_in1, layer_out1, clayer.weights, ucapture, usearch, ubackoff)
@@ -281,13 +290,17 @@ elif args.mode == 2:
     interval2   = 1000
 
     ### Layer Initialization ###
-
-    clayer = TNNColumnLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
-    vlayer = DualTNNVoterTallyLayer(rows_v, cols_v, nprev_v, classes_v, thetav_lo, thetav_hi, tau_eff,\
+    clayer = GlobalConvLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
+    clayer1 = TNNColumnLayer(28, 3, stride, 24, neurons, theta, ntype="rnl", device=device)
+    clayer2 = TNNColumnLayer(26, 3, stride, 24, neurons, theta, ntype="rnl", device=device)
+    clayer3 = TNNColumnLayer(24, 5, stride, 48, neurons, theta, ntype="rnl", device=device)
+    clayer4 = TNNColumnLayer(20, 5, stride, 48, neurons, theta, ntype="rnl", device=device)
+    vlayer = DualTNNVoterTallyLayer(16, 16, 48, classes_v, thetav_lo, thetav_hi, tau_eff,\
                                     device=device)
 
     if cuda:
-        clayer.cuda()
+        clayer1.cuda()
+        clayer2.cuda()
         vlayer.cuda()
 
 
@@ -318,14 +331,22 @@ elif args.mode == 2:
             #     else:
             #         target[0] = target[0] - 1
 
-            out1, layer_in1, layer_out1 = clayer(data[0].permute(1,2,0))
-            pred, voter_in, _           = vlayer(out1)
+            out, layer_in, layer_out    = clayer(data[0].permute(1,2,0))
+            out1, layer_in1, layer_out1 = clayer1(out)
+            out2, layer_in2, layer_out2 = clayer2(out1)
+            out3, layer_in3, layer_out3 = clayer3(out2)
+            out4, layer_in4, layer_out4 = clayer4(out3)
+            pred, voter_in, _           = vlayer(out4)
 
             if torch.argmax(pred) != target[0]:
                 error1 += 1
                 error2 += 1
 
-            clayer.weights = clayer.stdp(layer_in1, layer_out1, clayer.weights, ucapture, usearch, ubackoff)
+            clayer.weights = clayer.stdp(layer_in, layer_out, clayer.weights, ucapture, usearch, ubackoff)
+            clayer1.weights = clayer1.stdp(layer_in1, layer_out1, clayer1.weights, ucapture, usearch, ubackoff)
+            clayer2.weights = clayer2.stdp(layer_in2, layer_out2, clayer2.weights, ucapture, usearch, ubackoff)
+            clayer3.weights = clayer3.stdp(layer_in3, layer_out3, clayer3.weights, ucapture, usearch, ubackoff)
+            clayer4.weights = clayer4.stdp(layer_in4, layer_out4, clayer4.weights, ucapture, usearch, ubackoff)
             vlayer.weights = vlayer.stdp(target, voter_in, vlayer.weights)
 
             if (idx+1)%interval1 == 0:
@@ -361,8 +382,13 @@ elif args.mode == 2:
             # else:
             #     target[0] = target[0] - 1
 
-            out1, layer_in1, layer_out1 = clayer(data[0].permute(1,2,0))
-            pred, voter_in, _           = vlayer(out1)
+            out, layer_in, layer_out    = clayer(data[0].permute(1,2,0))
+            out1, layer_in1, layer_out1 = clayer1(out)
+            out2, layer_in2, layer_out2 = clayer2(out1)
+            out3, layer_in3, layer_out3 = clayer3(out2)
+            out4, layer_in4, layer_out4 = clayer4(out3)
+            pred, voter_in, _           = vlayer(out4)
+
 
             if torch.argmax(pred) != target[0]:
                 error1 += 1
@@ -370,8 +396,14 @@ elif args.mode == 2:
                 error3 += 1
 
             if inc_learn == 1:
-                clayer.weights = clayer.stdp(layer_in1, layer_out1, clayer.weights, ucapture, usearch, ubackoff)
+                clayer.weights = clayer.stdp(layer_in, layer_out, clayer.weights, ucapture, usearch, ubackoff)
+                clayer1.weights = clayer1.stdp(layer_in1, layer_out1, clayer1.weights, ucapture, usearch, ubackoff)
+                clayer2.weights = clayer2.stdp(layer_in2, layer_out2, clayer2.weights, ucapture, usearch, ubackoff)
+                clayer3.weights = clayer3.stdp(layer_in3, layer_out3, clayer3.weights, ucapture, usearch, ubackoff)
+                clayer4.weights = clayer4.stdp(layer_in4, layer_out4, clayer4.weights, ucapture, usearch, ubackoff)
                 vlayer.weights = vlayer.stdp(target, voter_in, vlayer.weights)
+
+
 
             if (idx+1)%interval2 == 0:
                 errorlist1.append(error1/(idx+1+breakpoint1))

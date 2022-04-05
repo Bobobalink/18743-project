@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from torchvision.datasets import MNIST
+from torchvision.datasets import CIFAR10
 from torchvision.utils import save_image
 
 from lab1 import *
@@ -48,7 +48,7 @@ neurons = 24
 
 inputsize = 28
 stride = 1
-nprev = 2
+nprev = 7
 theta = 4
 
 ### Voter Layer Parameters ###
@@ -69,20 +69,22 @@ if not cuda:
 
 ### MNIST dataset loading and preprocessing ###
 
-train_loader = DataLoader(MNIST('./data', True, download=True, transform=transforms.Compose(
+train_loader = DataLoader(CIFAR10('./data', True, download=True, transform=transforms.Compose(
     [
-        transforms.ToTensor(),
-        PosNeg(0.5)
+        PosNegRGB(0.5, 
+                transforms.Grayscale(num_output_channels=1),
+                transforms.ToTensor())
     ]
 )),
                           batch_size=1,
                           shuffle=False
                           )
 
-test_loader = DataLoader(MNIST('./data', False, download=True, transform=transforms.Compose(
+test_loader = DataLoader(CIFAR10('./data', False, download=True, transform=transforms.Compose(
     [
-        transforms.ToTensor(),
-        PosNeg(0.5)
+        PosNegRGB(0.5, 
+                transforms.Grayscale(num_output_channels=1),
+                transforms.ToTensor())
     ]
 )),
                          batch_size=1,

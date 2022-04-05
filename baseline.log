@@ -1,0 +1,41 @@
+Training for 49999 samples done in 2609.2735669612885
+Training Accuracy for 1 epochs: 29.235%
+Testing for 9999 samples done in 509.9371361732483
+Testing Accuracy: 15.45%
+Training for 49999 samples done in 2526.0755429267883
+Training Accuracy for 2 epochs: 29.46%
+Testing for 9999 samples done in 511.06409072875977
+Testing Accuracy: 15.59%
+Training for 49999 samples done in 2389.1746068000793
+Training Accuracy for 3 epochs: 29.51%
+Testing for 9999 samples done in 379.8049120903015
+Testing Accuracy: 15.56%
+Training for 49999 samples done in 2444.808459043503
+Training Accuracy for 4 epochs: 29.49%
+Testing for 9999 samples done in 506.82758617401123
+Testing Accuracy: 15.62%
+Training for 49999 samples done in 2590.317745923996
+Training Accuracy for 5 epochs: 29.496666666666666%
+Testing for 9999 samples done in 987.601802110672
+Testing Accuracy: 15.64%
+Training for 49999 samples done in 2257.6632781028748
+Training Accuracy for 6 epochs: 29.505%
+Testing for 9999 samples done in 428.3708190917969
+Testing Accuracy: 15.64%
+Training for 49999 samples done in 15540.420632839203
+Training Accuracy for 7 epochs: 29.51%
+Testing for 9999 samples done in 811.4029953479767
+Testing Accuracy: 15.64%
+Training for 49999 samples done in 41963.06586909294
+Training Accuracy for 8 epochs: 29.51%
+Testing for 9999 samples done in 514.1296179294586
+Testing Accuracy: 15.65%
+Training for 49999 samples done in 2927.1205310821533
+Training Accuracy for 9 epochs: 29.51%
+Testing for 9999 samples done in 575.2371838092804
+Testing Accuracy: 15.65%
+Training for 49999 samples done in 46016.99517393112
+Training Accuracy for 10 epochs: 29.51%
+Testing for 9999 samples done in 3142.5998289585114
+Testing Accuracy: 15.65%
+
