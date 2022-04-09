@@ -121,6 +121,10 @@ class GlobalConvLayer(nn.Module):
                 torch.round(((self.wmax + 1) / 2 + torch.randn(self.q, self.p)).clamp_(0, self.wmax)),
                 requires_grad=False)
 
+        self.floatDtype = torch.FloatTensor
+        if device.type == 'cuda':
+            self.floatDtype = torch.cuda.FloatTensor
+
         # Initialize the unsupervised STDP class for the current column layer
         self.stdp = STDP_Global(wres, self.rows, self.cols, self.num, self.p, device)
 
@@ -212,7 +216,7 @@ class GlobalConvLayer(nn.Module):
             didSpike, spikeTime = torch.max(timedPot >= self.theta, axis=1)
 
             # put the results in the outputs
-            ec_times = torch.where(didSpike, spikeTime.type(torch.cuda.FloatTensor), self.scalarInf)
+            ec_times = torch.where(didSpike, spikeTime.type(self.floatDtype), self.scalarInf)
             self.pot = torch.gather(timedPot, 1, spikeTime.unsqueeze(1)).squeeze()
 
         ######################################### NO NEED TO MODIFY #############################################
@@ -238,7 +242,7 @@ class GlobalConvLayer(nn.Module):
 
         # replace the pots of all the neurons that didn't spike first with 0
         minTime, _ = torch.min(self.ec_spiketimes, axis=1)
-        meaningfulPot = torch.where(self.ec_spiketimes == minTime.unsqueeze(1), self.pot.type(torch.cuda.FloatTensor), self.scalar0)
+        meaningfulPot = torch.where(self.ec_spiketimes == minTime.unsqueeze(1), self.pot.type(self.floatDtype), self.scalar0)
 
         # get the right index from this array
         mindex = torch.argmax(meaningfulPot, axis=1)

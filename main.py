@@ -25,10 +25,12 @@ args = parser.parse_args()
 
 ### Weight Update Parameters ###
 
-# local conv params
-# ucapture = 1.0 / 2
-# usearch = 1.0 / 1024
-# ubackoff = 1.0 / 2
+# local conv params (3x3x12)
+ucapture = 1.0 / 2
+usearch = 1.0 / 1024
+ubackoff = 1.0 / 2
+rfsize = 3
+neurons = 12
 
 # global conv params (3x3x12)
 # ucapture = 1.0 / 1.5
@@ -38,11 +40,11 @@ args = parser.parse_args()
 # neurons = 12
 
 # global conv (5x5x24)
-ucapture = 1.0 / 4
-usearch = 1.0 / 3096
-ubackoff = 1.0 / 4
-rfsize = 5
-neurons = 24
+# ucapture = 1.0 / 4
+# usearch = 1.0 / 3096
+# ubackoff = 1.0 / 4
+# rfsize = 5
+# neurons = 24
 
 ### Column Layer Parameters ###
 
@@ -90,17 +92,17 @@ test_loader = DataLoader(MNIST('./data', False, download=True, transform=transfo
                          )
 
 
-inc_learn = 1
-breakpoint1 = 60000
-# breakpoint1 = 20000
+inc_learn = 0
+# breakpoint1 = 60000
+breakpoint1 = 20000
 interval1 = 1000
 breakpoint2 = 10000
 interval2 = 1000
 
 ### Layer Initialization ###
 
-# clayer = TNNColumnLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
-clayer = GlobalConvLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
+clayer = TNNColumnLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
+# clayer = GlobalConvLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
 vlayer = DualTNNVoterTallyLayer(rows_v, cols_v, nprev_v, classes_v, thetav_lo, thetav_hi, tau_eff, device=device)
 
 if cuda:
@@ -182,11 +184,11 @@ for idx, (data, target) in enumerate(test_loader):
         data = data.cuda()
         target = target.cuda()
 
-    data = torch.transpose(data, 2, 3)
-    if (target[0] % 2) == 0:
-        target[0] = target[0] + 1
-    else:
-        target[0] = target[0] - 1
+    # data = torch.transpose(data, 2, 3)
+    # if (target[0] % 2) == 0:
+    #     target[0] = target[0] + 1
+    # else:
+    #     target[0] = target[0] - 1
 
     out1, layer_in1, layer_out1 = clayer(data[0].permute(1, 2, 0))
     pred, voter_in, _ = vlayer(out1)
@@ -216,6 +218,10 @@ print("Testing Accuracy: {0}%".format((breakpoint2 - error3) * 100 / breakpoint2
 plt.figure(figsize=(10, 4))
 
 dx = [i for i in range(1, int(breakpoint1 / interval1 + breakpoint2 / interval2 + 1))]
+
+savearr = np.array([dx, errorlist2])
+np.save('errors', savearr)
+
 plt.plot(dx, errorlist2, color='red', linestyle='solid', linewidth=1.5)
 plt.ylim((0, 0.25))
 
