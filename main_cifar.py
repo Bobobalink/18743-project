@@ -58,6 +58,8 @@ tau_eff = 2
 ### Enabling CUDA support for GPU ###
 cuda = torch.cuda.is_available()
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+if not cuda:
+    torch.set_num_threads(8)
 
 ### MNIST dataset loading and preprocessing ###
 
@@ -90,342 +92,162 @@ test_loader = DataLoader(CIFAR10('./data', False, download=True, transform=trans
                          )
 
 
-######################## Step-No-Leak Column Simulation ##################
-if args.mode == 0:
-
-    weights_save = 1
-
-    ### Layer Initialization ###
-
-    clayer = TNNColumnLayer(32, 32, 1, 2, 12, 400, ntype="snl", device=device)
-
-    if cuda:
-        clayer.cuda()
-
-
-    ### Training ###
-
-    print("Starting column training")
-    for epochs in range(1):
-        start = time.time()
-
-        for idx, (data,target) in enumerate(train_loader):
-            if idx == 10000:
-                break
-            print("Sample: {0}\r".format(idx), end="")
-
-            if cuda:
-                data                    = data.cuda()
-                target                  = target.cuda()
-            
-            
-            print(data)
-            break
-
-            out1, layer_in1, layer_out1 = clayer(data[0].permute(1,2,0))
-            clayer.weights = clayer.stdp(layer_in1, layer_out1, clayer.weights, ucapture, usearch, ubackoff)
-
-            endt                   = time.time()
-            #print("                                 Time elapsed: {0}\r".format(endt-start), end="")
-
-        end   = time.time()
-        print("Column training done in ", end-start)
-
-
-    ### Display and save weights as images ###
-
-    if weights_save == 1:
-
-        image_list = []
-        for i in range(12):
-            temp = clayer.weights[i].reshape(56,28)
-            image_list.append(temp)
-
-        out = torch.stack(image_list, dim=0).unsqueeze(1)
-        save_image(out, 'column_visweights_snl.png', nrow=6)
-
-
-    ### Testing and computing metrics ###
-
-    table    = torch.zeros((12,10))
-    pred     = torch.zeros(10)
-    totals   = torch.zeros(10)
-
-    print("Starting testing")
-    start    = time.time()
-
-    for idx, (data,target) in enumerate(test_loader):
-        print("Sample: {0}\r".format(idx), end="")
-
-        if cuda:
-            data                    = data.cuda()
-            target                  = target.cuda()
-
-        out1, layer_in1, layer_out1 = clayer(data[0].permute(1,2,0))
-        out = torch.flatten(out1)
-
-        arg = torch.nonzero(out != float('Inf'))
-
-        if arg.shape[0] != 0:
-            table[arg[0].long(), target[0]] += 1
-
-        endt = time.time()
-        #print("                                 Time elapsed: {0}\r".format(endt-start), end="")
-
-    end = time.time()
-    print("Testing done in ", end-start)
-
-    print("Confusion Matrix:")
-    print(table)
-
-    maxval   = torch.max(table, 1)[0]
-    totals   = torch.sum(table, 1)
-    pred     = torch.sum(maxval)
-    covg_cnt = torch.sum(totals)
-
-    print("Purity: ", pred/covg_cnt)
-    print("Coverage: ", covg_cnt/(idx+1))
-
-
-####################### Ramp-No-Leak Column Simulation #######################
-elif args.mode == 1:
-
-    weights_save = 1
-
-    ### Layer Initialization ###
-
-    clayer = TNNColumnLayer(28, 28, 1, 2, 12, 400, ntype="rnl", device=device)
-
-    if cuda:
-        clayer.cuda()
-
-
-    ### Training ###
-
-    print("Starting column training")
-    for epochs in range(1):
-        start = time.time()
-
-        for idx, (data,target) in enumerate(train_loader):
-            if idx == 10000:
-                break
-            print("Sample: {0}\r".format(idx), end="")
-
-            if cuda:
-                data                    = data.cuda()
-                target                  = target.cuda()
-
-            out1, layer_in1, layer_out1 = clayer(data[0].permute(1,2,0))
-            clayer.weights = clayer.stdp(layer_in1, layer_out1, clayer.weights, ucapture, usearch, ubackoff)
-
-            endt                   = time.time()
-            #print("                                 Time elapsed: {0}\r".format(endt-start), end="")
-
-        end   = time.time()
-        print("Column training done in ", end-start)
-
-
-    ### Display and save weights as images ###
-
-    if weights_save == 1:
-
-        image_list = []
-        for i in range(12):
-            temp = clayer.weights[i].reshape(56,28)
-            image_list.append(temp)
-
-        out = torch.stack(image_list, dim=0).unsqueeze(1)
-        save_image(out, 'column_visweights_rnl.png', nrow=6)
-
-
-    ### Testing and computing metrics ###
-
-    table    = torch.zeros((12,10))
-    pred     = torch.zeros(10)
-    totals   = torch.zeros(10)
-
-    print("Starting testing")
-    start    = time.time()
-
-    for idx, (data,target) in enumerate(test_loader):
-        print("Sample: {0}\r".format(idx), end="")
-
-        if cuda:
-            data                    = data.cuda()
-            target                  = target.cuda()
-
-        out1, layer_in1, layer_out1 = clayer(data[0].permute(1,2,0))
-        out = torch.flatten(out1)
-
-        arg = torch.nonzero(out != float('Inf'))
-
-        if arg.shape[0] != 0:
-            table[arg[0].long(), target[0]] += 1
-
-        endt = time.time()
-        #print("                                 Time elapsed: {0}\r".format(endt-start), end="")
-
-    end = time.time()
-    print("Testing done in ", end-start)
-
-    print("Confusion Matrix:")
-    print(table)
-
-    maxval   = torch.max(table, 1)[0]
-    totals   = torch.sum(table, 1)
-    pred     = torch.sum(maxval)
-    covg_cnt = torch.sum(totals)
-
-    print("Purity: ", pred/covg_cnt)
-    print("Coverage: ", covg_cnt/(idx+1))
-
-
 ############################## Online Learning ##############################
-elif args.mode == 2:
 
-    inc_learn   = 1
-    breakpoint1 = 60000
-    interval1   = 1000
-    breakpoint2 = 10000
-    interval2   = 1000
+inc_learn   = 1
+breakpoint1 = 60000
+interval1   = 1000
+breakpoint2 = 10000
+interval2   = 1000
 
-    ### Layer Initialization ###
-    clayer = GlobalConvLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
-    clayer1 = TNNColumnLayer(28, 3, stride, 24, neurons, theta, ntype="rnl", device=device)
-    clayer2 = TNNColumnLayer(26, 3, stride, 24, neurons, theta, ntype="rnl", device=device)
-    clayer3 = TNNColumnLayer(24, 5, stride, 48, neurons, theta, ntype="rnl", device=device)
-    clayer4 = TNNColumnLayer(20, 5, stride, 48, neurons, theta, ntype="rnl", device=device)
-    vlayer = DualTNNVoterTallyLayer(16, 16, 48, classes_v, thetav_lo, thetav_hi, tau_eff,\
-                                    device=device)
+### Layer Initialization ###
+# input size (1 side), RF size (1 side), RF stride, prev layer neurons, cur layer neurons, threshold
+clayer = GlobalConvLayer(inputsize, rfsize, stride, nprev, 24, 4, ntype="rnl", device=device)
+# clayer1 = TNNColumnLayer(28, 3, 1, 24, 24, 4, ntype="rnl", device=device)
+# clayer2 = TNNColumnLayer(26, 3, 1, 24, 48, 4, ntype="rnl", device=device)
+# clayer3 = TNNColumnLayer(24, 5, 1, 48, 48, 4, ntype="rnl", device=device)
+# clayer4 = TNNColumnLayer(20, 5, 1, 48, 48, 4, ntype="rnl", device=device)
+vlayer = DualTNNVoterTallyLayer(28, 28, 24, classes_v, thetav_lo, thetav_hi, tau_eff, device=device)
 
-    if cuda:
-        clayer1.cuda()
-        clayer2.cuda()
-        vlayer.cuda()
+if cuda:
+    clayer.cuda()
+    # clayer1.cuda()
+    # clayer2.cuda()
+    clayer3.cuda()
+    clayer4.cuda()
+    vlayer.cuda()
 
 
-    ### Training ###
+### Training ###
 
-    for epochs in range(20):
-        start = time.time()
-        error1 = 0
-        error2 = 0
-        errorlist1 = []
-        errorlist2 = []
+for epochs in range(1):
+    start = time.time()
+    error1 = 0
+    error2 = 0
+    errorlist1 = []
+    errorlist2 = []
 
-        for idx, (data,target) in enumerate(train_loader):
-            # if idx == breakpoint1:
-            #     break
-            print("Sample: {0}\r".format(idx+1), end="")
+    for idx, (data, target) in enumerate(train_loader):
+        # if idx == breakpoint1:
+        #     break
+        print("Sample: {0}\r".format(idx+1), end="")
 
-            if cuda:
-                data                    = data.cuda()
-                target                  = target.cuda()
+        if cuda:
+            data                    = data.cuda()
+            target                  = target.cuda()
 
-            # if (idx+1) > 20000:
-            #     data                    = torch.transpose(data,2,3)
+        # if (idx+1) > 20000:
+        #     data                    = torch.transpose(data,2,3)
 
-            # if (idx+1) > 50000:
-            #     if (target[0]%2) == 0:
-            #         target[0] = target[0] + 1
-            #     else:
-            #         target[0] = target[0] - 1
+        # if (idx+1) > 50000:
+        #     if (target[0]%2) == 0:
+        #         target[0] = target[0] + 1
+        #     else:
+        #         target[0] = target[0] - 1
 
-            out, layer_in, layer_out    = clayer(data[0].permute(1,2,0))
-            out1, layer_in1, layer_out1 = clayer1(out)
-            out2, layer_in2, layer_out2 = clayer2(out1)
-            out3, layer_in3, layer_out3 = clayer3(out2)
-            out4, layer_in4, layer_out4 = clayer4(out3)
-            pred, voter_in, _           = vlayer(out4)
+        out, layer_in, layer_out    = clayer(data[0].permute(1, 2, 0))
+        # out1, layer_in1, layer_out1 = clayer1(out)
+        # out2, layer_in2, layer_out2 = clayer2(out1)
+        # out3, layer_in3, layer_out3 = clayer3(out2)
+        # out4, layer_in4, layer_out4 = clayer4(out3)
+        pred, voter_in, _           = vlayer(out)
 
-            if torch.argmax(pred) != target[0]:
-                error1 += 1
-                error2 += 1
+        if torch.argmax(pred) != target[0]:
+            error1 += 1
+            error2 += 1
 
+        clayer.weights = clayer.stdp(layer_in, layer_out, clayer.weights, ucapture, usearch, ubackoff)
+        # clayer1.weights = clayer1.stdp(layer_in1, layer_out1, clayer1.weights, ucapture, usearch, ubackoff)
+        # clayer2.weights = clayer2.stdp(layer_in2, layer_out2, clayer2.weights, ucapture, usearch, ubackoff)
+        # clayer3.weights = clayer3.stdp(layer_in3, layer_out3, clayer3.weights, ucapture, usearch, ubackoff)
+        # clayer4.weights = clayer4.stdp(layer_in4, layer_out4, clayer4.weights, ucapture, usearch, ubackoff)
+        vlayer.weights = vlayer.stdp(target, voter_in, vlayer.weights)
+
+        if (idx+1)%interval1 == 0:
+            errorlist1.append(error1/(idx+1))
+            errorlist2.append(error2/interval1)
+            error2 = 0
+
+        endt = time.time()
+        #print("                                                     Time elapsed: {0}\r".format(endt-start), end="")
+
+    end = time.time()
+    print("Training for {0} samples done in {1}".format(idx, end-start))
+    print("Training Accuracy for {1} epochs: {0}%".format((60000-error1)*100/60000, epochs+1))
+
+
+### Testing ###
+
+    error3 = 0
+    start = time.time()
+
+    for idx, (data, target) in enumerate(test_loader):
+        # if idx == breakpoint2:
+        #     break
+        print("Sample: {0}\r".format(idx+1+breakpoint1), end="")
+
+        if cuda:
+            data                    = data.cuda()
+            target                  = target.cuda()
+
+        # data                    = torch.transpose(data,2,3)
+        # if (target[0]%2) == 0:
+        #     target[0] = target[0] + 1
+        # else:
+        #     target[0] = target[0] - 1
+
+        out, layer_in, layer_out    = clayer(data[0].permute(1, 2, 0))
+        # out1, layer_in1, layer_out1 = clayer1(out)
+        # out2, layer_in2, layer_out2 = clayer2(out1)
+        # out3, layer_in3, layer_out3 = clayer3(out2)
+        # out4, layer_in4, layer_out4 = clayer4(out3)
+        pred, voter_in, _           = vlayer(out)
+
+
+        if torch.argmax(pred) != target[0]:
+            error1 += 1
+            error2 += 1
+            error3 += 1
+
+        if inc_learn == 1:
             clayer.weights = clayer.stdp(layer_in, layer_out, clayer.weights, ucapture, usearch, ubackoff)
-            clayer1.weights = clayer1.stdp(layer_in1, layer_out1, clayer1.weights, ucapture, usearch, ubackoff)
-            clayer2.weights = clayer2.stdp(layer_in2, layer_out2, clayer2.weights, ucapture, usearch, ubackoff)
-            clayer3.weights = clayer3.stdp(layer_in3, layer_out3, clayer3.weights, ucapture, usearch, ubackoff)
-            clayer4.weights = clayer4.stdp(layer_in4, layer_out4, clayer4.weights, ucapture, usearch, ubackoff)
+            # clayer1.weights = clayer1.stdp(layer_in1, layer_out1, clayer1.weights, ucapture, usearch, ubackoff)
+            # clayer2.weights = clayer2.stdp(layer_in2, layer_out2, clayer2.weights, ucapture, usearch, ubackoff)
+            # clayer3.weights = clayer3.stdp(layer_in3, layer_out3, clayer3.weights, ucapture, usearch, ubackoff)
+            # clayer4.weights = clayer4.stdp(layer_in4, layer_out4, clayer4.weights, ucapture, usearch, ubackoff)
             vlayer.weights = vlayer.stdp(target, voter_in, vlayer.weights)
 
-            if (idx+1)%interval1 == 0:
-                errorlist1.append(error1/(idx+1))
-                errorlist2.append(error2/interval1)
-                error2 = 0
+        if (idx+1)%interval2 == 0:
+            errorlist1.append(error1/(idx+1+breakpoint1))
+            errorlist2.append(error2/interval2)
+            error2 = 0
 
-            endt = time.time()
-            #print("                                                     Time elapsed: {0}\r".format(endt-start), end="")
+        endt = time.time()
+        #print("                                                     Time elapsed: {0}\r".format(endt-start), end="")
 
-        end = time.time()
-        print("Training for {0} samples done in {1}".format(idx, end-start))
-        print("Training Accuracy for {1} epochs: {0}%".format((60000-error1)*100/60000, epochs+1))
+    end = time.time()
+    print("Testing for {0} samples done in {1}".format(idx, end-start))
+    print("Testing Accuracy: {0}%".format((10000-error3)*100/10000))
 
-
-    ### Testing ###
-
-        error3 = 0
-        start = time.time()
-
-        for idx, (data,target) in enumerate(test_loader):
-            # if idx == breakpoint2:
-            #     break
-            print("Sample: {0}\r".format(idx+1+breakpoint1), end="")
-
-            if cuda:
-                data                    = data.cuda()
-                target                  = target.cuda()
-
-            # data                    = torch.transpose(data,2,3)
-            # if (target[0]%2) == 0:
-            #     target[0] = target[0] + 1
-            # else:
-            #     target[0] = target[0] - 1
-
-            out, layer_in, layer_out    = clayer(data[0].permute(1,2,0))
-            out1, layer_in1, layer_out1 = clayer1(out)
-            out2, layer_in2, layer_out2 = clayer2(out1)
-            out3, layer_in3, layer_out3 = clayer3(out2)
-            out4, layer_in4, layer_out4 = clayer4(out3)
-            pred, voter_in, _           = vlayer(out4)
+# save the weight images
+image_list = []
+for i in range(clayer.weights.shape[0]):
+    rflen = clayer.rfsize[0] * clayer.rfsize[1]
+    nchans = clayer.weights.shape[1] // rflen
+    temp = clayer.weights[i].reshape(nchans * clayer.rfsize[0], clayer.rfsize[1])
+    image_list.append(temp)
+out = torch.stack(image_list, dim=0).unsqueeze(1)
+save_image(out, 'weightviz.png', nrow=6, pad_value=0.25)
 
 
-            if torch.argmax(pred) != target[0]:
-                error1 += 1
-                error2 += 1
-                error3 += 1
+### Storing image ###
+plt.figure(figsize=(10,4))
 
-            if inc_learn == 1:
-                clayer.weights = clayer.stdp(layer_in, layer_out, clayer.weights, ucapture, usearch, ubackoff)
-                clayer1.weights = clayer1.stdp(layer_in1, layer_out1, clayer1.weights, ucapture, usearch, ubackoff)
-                clayer2.weights = clayer2.stdp(layer_in2, layer_out2, clayer2.weights, ucapture, usearch, ubackoff)
-                clayer3.weights = clayer3.stdp(layer_in3, layer_out3, clayer3.weights, ucapture, usearch, ubackoff)
-                clayer4.weights = clayer4.stdp(layer_in4, layer_out4, clayer4.weights, ucapture, usearch, ubackoff)
-                vlayer.weights = vlayer.stdp(target, voter_in, vlayer.weights)
+dx = [i for i in range(1,int(breakpoint1/interval1+breakpoint2/interval2+1))]
+plt.plot(dx, errorlist2, color='red', linestyle='solid', linewidth=1.5)
 
-
-
-            if (idx+1)%interval2 == 0:
-                errorlist1.append(error1/(idx+1+breakpoint1))
-                errorlist2.append(error2/interval2)
-                error2 = 0
-
-            endt = time.time()
-            #print("                                                     Time elapsed: {0}\r".format(endt-start), end="")
-
-        end = time.time()
-        print("Testing for {0} samples done in {1}".format(idx, end-start))
-        print("Testing Accuracy: {0}%".format((10000-error3)*100/10000))
-
-
-    ### Storing image ###
-    plt.figure(figsize=(10,4))
-
-    dx = [i for i in range(1,int(breakpoint1/interval1+breakpoint2/interval2+1))]
-    plt.plot(dx, errorlist2, color='red', linestyle='solid', linewidth=1.5)
-
-    plt.xlabel("Samples (x1000)")
-    plt.ylabel("Error Rate")
-    plt.xticks(np.arange(1,int(breakpoint1/interval1+breakpoint2/interval2+1),2))
-    plt.legend(["ECVT"])
-    plt.savefig("online_learning.png")
+plt.xlabel("Samples (x1000)")
+plt.ylabel("Error Rate")
+plt.xticks(np.arange(1,int(breakpoint1/interval1+breakpoint2/interval2+1),2))
+plt.legend(["ECVT"])
+plt.savefig("online_learning.png")

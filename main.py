@@ -67,7 +67,7 @@ tau_eff = 2
 cuda = torch.cuda.is_available()
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 if not cuda:
-    torch.set_num_threads(12)
+    torch.set_num_threads(8)
 
 ### MNIST dataset loading and preprocessing ###
 
