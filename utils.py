@@ -2,11 +2,48 @@
 
 import torch
 import torch.nn as nn
+from torchvision.transforms.functional import to_tensor
 from torchvision import transforms
+from torchvision.utils import save_image
+from PIL import Image, ImageCms
 
 import time
 
 ### PosNeg Encoding ###
+
+
+# output posneg encoding on the black/white channel, the red/green channel, and the blue/yellow channel
+# 6 channels in total
+class PerceptualPosNeg:
+    def __init__(self, pn_thresh):
+        self.pn_thresh = pn_thresh
+        srgb = ImageCms.createProfile('sRGB')
+        lab = ImageCms.createProfile('LAB')
+        self.colorConvert = ImageCms.buildTransformFromOpenProfiles(srgb, lab, 'RGB', 'LAB')
+
+    def doPosNeg(self, tensor):
+        tensor -= torch.min(tensor)
+        maxt = torch.max(tensor)
+        tensor[tensor >= (self.pn_thresh * maxt)] = float('Inf')
+        tensor[tensor < (self.pn_thresh * maxt)] = 0
+        tensor_pos = tensor.clone()
+        tensor_pos[tensor_pos == 0] = 1
+        tensor_pos[tensor_pos == float('Inf')] = 0
+        tensor_pos[tensor_pos == 1] = float('Inf')
+        out = torch.cat([tensor_pos, tensor], dim=0)
+        return out
+
+    def __call__(self, img):
+        lab = ImageCms.applyTransform(img, self.colorConvert)
+        l, a, b = lab.split()
+        lt = to_tensor(l)
+        at = to_tensor(a)
+        bt = to_tensor(b)
+        lpn = self.doPosNeg(lt)
+        apn = self.doPosNeg(at)
+        bpn = self.doPosNeg(bt)
+        return torch.cat([lpn, apn, bpn], dim=0)
+
 
 class PosNegRGB(object):
     def __init__(self, pn_threshold, greyscale, to_tensor):
@@ -15,7 +52,6 @@ class PosNegRGB(object):
         self.to_tensor = to_tensor
 
     def __call__(self, img):
-        
         greyscale = self.to_tensor(self.greyscale(img))
         out = greyscale
         tensor = self.to_tensor(img)
@@ -27,12 +63,13 @@ class PosNegRGB(object):
         tensor[tensor < (self.pn_thresh * maxt)] = 0
         tensor_pos = tensor.clone()
         tensor_pos[tensor_pos == 0] = 1
-        tensor_pos[tensor_pos == float('Inf')] == 0
+        tensor_pos[tensor_pos == float('Inf')] = 0
         tensor_pos[tensor_pos == 1] = float('Inf')
         tensor = tensor.reshape(t_shape)
         tensor_pos = tensor_pos.reshape(t_shape)
         out = torch.cat([out, tensor, tensor_pos], dim=0)
         return out
+
 
 class PosNeg(object):
     def __init__(self, pn_threshold):
@@ -137,3 +174,31 @@ class DualRSTDP_Voter():
         weights[1, :, :, :] += voter_in * target
 
         return nn.Parameter(weights.clamp_(0, self.wmax), requires_grad=False)
+
+
+# convert a weight matrix to a meaningful display of the underlying pixels
+def reshapePosNeg(tensor: torch.Tensor, rfSize, wmax=7):
+    # reshape the array to [neurons, channels, posneg, width, height]
+    to = torch.reshape(tensor, [tensor.shape[0], -1, 2, rfSize[0], rfSize[1]])
+    # invert the negative side of the posneg
+    to[:, :, 1, :, :] = wmax - to[:, :, 1, :, :]
+
+    # sum the positive and negative contributions
+    flattened = torch.sum(to, dim=2)
+
+    # normalize to [0, 1]
+    fNorm = flattened / (2 * wmax)
+
+    return fNorm
+
+
+def displayWeights(weights, rfSize, fname, posneg=True, wmax=7, nrow=6):
+    if posneg:
+        fNorm = reshapePosNeg(weights, rfSize, wmax)
+    else:
+        fNorm = torch.reshape(weights, [weights.shape[0], -1, rfSize[0], rfSize[1]])
+
+    # save one image per processed channel
+    for i in range(fNorm.shape[1]):
+        save_image(fNorm[:, i, :, :].unsqueeze(1), '{}c{}.png'.format(fname, i), nrow=nrow, pad_value=0.25)
+

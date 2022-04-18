@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import MNIST
 from torchvision.utils import save_image
 
 from lab1 import *
@@ -26,18 +26,18 @@ args = parser.parse_args()
 ### Weight Update Parameters ###
 
 # local conv params (3x3x12)
-ucapture = 1.0 / 2
-usearch = 1.0 / 1024
-ubackoff = 1.0 / 2
-rfsize = 3
-neurons = 12
-
-# global conv params (3x3x12)
-# ucapture = 1.0 / 1.5
-# usearch = 1.0 / 768
-# ubackoff = 1.0 / 1.5
+# ucapture = 1.0 / 2
+# usearch = 1.0 / 1024
+# ubackoff = 1.0 / 2
 # rfsize = 3
 # neurons = 12
+
+# global conv params (3x3x12)
+ucapture = 1.0 / 1.5
+usearch = 1.0 / 768
+ubackoff = 1.0 / 1.5
+rfsize = 3
+neurons = 12
 
 # global conv (5x5x24)
 # ucapture = 1.0 / 4
@@ -50,7 +50,7 @@ neurons = 12
 
 inputsize = 28
 stride = 1
-nprev = 7
+nprev = 2
 theta = 4
 
 ### Voter Layer Parameters ###
@@ -67,26 +67,24 @@ tau_eff = 2
 cuda = torch.cuda.is_available()
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 if not cuda:
-    torch.set_num_threads(8)
+    torch.set_num_threads(12)
 
 ### MNIST dataset loading and preprocessing ###
 
-train_loader = DataLoader(CIFAR10('./data', True, download=True, transform=transforms.Compose(
+train_loader = DataLoader(MNIST('./data', True, download=True, transform=transforms.Compose(
     [
-        PosNegRGB(0.5, 
-                transforms.Grayscale(num_output_channels=1),
-                transforms.ToTensor())
+        transforms.ToTensor(),
+        PosNeg(0.5)
     ]
 )),
                           batch_size=1,
                           shuffle=False
                           )
 
-test_loader = DataLoader(CIFAR10('./data', False, download=True, transform=transforms.Compose(
+test_loader = DataLoader(MNIST('./data', False, download=True, transform=transforms.Compose(
     [
-        PosNegRGB(0.5, 
-                transforms.Grayscale(num_output_channels=1),
-                transforms.ToTensor())
+        transforms.ToTensor(),
+        PosNeg(0.5)
     ]
 )),
                          batch_size=1,
@@ -96,15 +94,15 @@ test_loader = DataLoader(CIFAR10('./data', False, download=True, transform=trans
 
 inc_learn = 0
 # breakpoint1 = 60000
-breakpoint1 = 20000
+breakpoint1 = 1000
 interval1 = 1000
 breakpoint2 = 10000
 interval2 = 1000
 
 ### Layer Initialization ###
 
-clayer = TNNColumnLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
-# clayer = GlobalConvLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
+# clayer = TNNColumnLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
+clayer = GlobalConvLayer(inputsize, rfsize, stride, nprev, neurons, theta, ntype="rnl", device=device)
 vlayer = DualTNNVoterTallyLayer(rows_v, cols_v, nprev_v, classes_v, thetav_lo, thetav_hi, tau_eff, device=device)
 
 if cuda:
@@ -163,14 +161,7 @@ for epochs in range(1):
     print("Training Accuracy for {1} epochs: {0}%".format((breakpoint1 - error1) * 100 / breakpoint1, epochs + 1))
 
 # save the weight images
-image_list = []
-for i in range(clayer.weights.shape[0]):
-    rflen = clayer.rfsize[0] * clayer.rfsize[1]
-    nchans = clayer.weights.shape[1] // rflen
-    temp = clayer.weights[i].reshape(nchans * clayer.rfsize[0], clayer.rfsize[1])
-    image_list.append(temp)
-out = torch.stack(image_list, dim=0).unsqueeze(1)
-save_image(out, 'weightviz.png', nrow=6, pad_value=0.25)
+displayWeights(clayer.weights, clayer.rfsize, 'mnistWeights')
 
 ### Testing ###
 
