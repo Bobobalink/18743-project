@@ -196,7 +196,7 @@ def displayWeights(weights, rfSize, fname, posneg=True, wmax=7, nrow=6):
     if posneg:
         fNorm = reshapePosNeg(weights, rfSize, wmax)
     else:
-        fNorm = torch.reshape(weights, [weights.shape[0], -1, rfSize[0], rfSize[1]])
+        fNorm = torch.reshape(weights, (weights.shape[0], -1, rfSize[0], rfSize[1]))
 
     # save one image per processed channel
     for i in range(fNorm.shape[1]):

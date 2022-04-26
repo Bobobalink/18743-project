@@ -96,10 +96,10 @@ interval2 = 1000
 
 ### Layer Initialization ###
 # input size (1 side), RF size (1 side), RF stride, prev layer neurons, cur layer neurons, threshold
-lChanLayer = GlobalConvLayer(32, 3, 1, 2, 12, 7 * 3, ntype='rnl', device=device)
-uChanLayer = GlobalConvLayer(32, 3, 1, 2, 12, 7 * 3, ntype='rnl', device=device)
-vChanLayer = GlobalConvLayer(32, 3, 1, 2, 12, 7 * 3, ntype='rnl', device=device)
-combineLayer = GlobalConvLayer(30, 1, 1, 36, 24, 7 * 2, ntype='rnl', device=device)
+lChanLayer = GlobalConvLayer(32, 3, 1, 2, 6, 7 * 3, ntype='rnl', device=device)
+uChanLayer = GlobalConvLayer(32, 3, 1, 2, 6, 7 * 3, ntype='rnl', device=device)
+vChanLayer = GlobalConvLayer(32, 3, 1, 2, 6, 7 * 3, ntype='rnl', device=device)
+combineLayer = GlobalConvLayer(30, 1, 1, 36, 36, 7 * 2, ntype='rnl', device=device)
 # clayer = GlobalConvLayer(inputsize, rfsize, stride, nprev, 24, 4, ntype="rnl", device=device)
 # clayer1 = TNNColumnLayer(28, 3, 1, 24, 24, 4, ntype="rnl", device=device)
 # clayer2 = TNNColumnLayer(26, 3, 1, 24, 48, 4, ntype="rnl", device=device)

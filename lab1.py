@@ -112,6 +112,8 @@ class TNNColumnLayer(nn.Module):
             self.weights = nn.Parameter(torch.zeros(self.num, self.p), requires_grad=False)
         elif w_init == "half":
             self.weights = nn.Parameter((self.wmax / 2) * torch.ones(self.num, self.p), requires_grad=False)
+        elif w_init == "full":
+            self.weights = nn.Parameter(self.wmax * torch.ones(self.num, self.p), requires_grad=False)
         elif w_init == "uniform":
             self.weights = nn.Parameter(
                 torch.randint(low=0, high=self.wmax + 1, size=(self.num, self.p)).type(torch.FloatTensor),
