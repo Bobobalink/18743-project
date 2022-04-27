@@ -64,7 +64,7 @@ def main():
     ubackoff = 0.85 / 7
     usearch = 1 / 4000
 
-    rng = np.random.default_rng(seed=5432)
+    rng = np.random.default_rng(seed=54321)
 
     # setup some stuff
     cuda = torch.cuda.is_available()
