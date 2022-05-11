@@ -60,11 +60,11 @@ def main():
     noiseProb = 0.1
     importantProb = 0.5
 
-    ucap = 0.5 / 7
-    ubackoff = 0.85 / 7
+    ucap = 0.5 / 6
+    ubackoff = 0.85 / 6
     usearch = 1 / 4000
 
-    rng = np.random.default_rng(seed=5432)
+    rng = np.random.default_rng(seed=54321)
 
     # setup some stuff
     cuda = torch.cuda.is_available()
